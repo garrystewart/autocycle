@@ -3,6 +3,9 @@
 using IronOcr;
 using System.Diagnostics;
 using System.Drawing;
+using System.Net.Sockets;
+using System.Net;
+using System.Text;
 
 Console.WriteLine("Hello, World!");
 
@@ -30,8 +33,14 @@ while (true)
         Input.AddImage(@"C:\Users\garry\OneDrive\Desktop\Bike.png", ContentArea);
         var Result = Ocr.Read(Input);
         Console.WriteLine(Result.Text);
+
+        UdpClient client = new UdpClient(5005);
+        IPEndPoint ip = new IPEndPoint(IPAddress.Parse("192.168.1.173"), 5005);
+        byte[] bytes = Encoding.ASCII.GetBytes("20");
+        client.Send(bytes, bytes.Length, ip);
+        client.Close();
+        Console.WriteLine("Sent: {0} ", "20");
     }
 
     Thread.Sleep(1000);
 }
-
