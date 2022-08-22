@@ -19,27 +19,25 @@ namespace AutoCycle2
         private const ushort _screenWidth = 1920;
         private const ushort _screenHeight = 1080;
 
-        private const byte _tolerance = 2;
         private const ushort _poll = 1000;
+        private const byte _confidence = 90;
+        private const short _base = 3;
 
-
-        private static bool Troubleshooting => true;
+        private static bool Troubleshooting => false;
 
         static void Main(string[] args)
         {
-            byte? _previousReading = null;
-
             Console.WriteLine("AutoCycle2");
 
             TesseractConfiguration tesseractConfiguration = new TesseractConfiguration();
             tesseractConfiguration.PageSegmentationMode = TesseractPageSegmentationMode.SingleLine;
-            tesseractConfiguration.WhiteListCharacters = "-0123456789% ";
+            tesseractConfiguration.WhiteListCharacters = "-0123456789%";
 
             IronTesseract ironTesseract = new IronTesseract(tesseractConfiguration);
-            ironTesseract.Language = OcrLanguage.Financial;
+            //ironTesseract.Language = OcrLanguage.Financial;
 
             //Rectangle rectangle = new Rectangle(1740, 1019, 73, 41);
-            Rectangle rectangle = new Rectangle(458, 1024, 238, 56);
+            Rectangle rectangle = new Rectangle(458, 1024, 238, 56); // Neigung
 
             int count = 0;
 
@@ -55,6 +53,7 @@ namespace AutoCycle2
                 {
                     ocrInput.AddImage(croppedBitmap);
                     ocrInput.ToGrayScale();
+                    //ocrInput.DeNoise();
 
                     if (Troubleshooting)
                     {
@@ -63,41 +62,53 @@ namespace AutoCycle2
 
                     OcrResult ocrResult = ironTesseract.Read(ocrInput);
 
-                    Send($"{ocrResult.Text} Confidence: {ocrResult.Confidence}");
-                    Thread.Sleep(_poll);
-                    continue;
+                    string resultString = ocrResult.Text.Replace("%", "");
 
-                    if (byte.TryParse(ocrResult.Text, out byte result))
-                    {
-                        _previousReading = ProcessResult(result, count, _previousReading);
-                    }
-                    else
-                    {
-                        Regex regex = new Regex("\\d");
-                        Match match = regex.Match(ocrResult.Text);
+                    //Send($"{ocrResult.Text} Confidence: {ocrResult.Confidence}");
+                    //Thread.Sleep(_poll);
+                    //continue;
 
-                        if (match.Success)
-                        {
-                            if (byte.TryParse(match.Value, out byte regexResult))
-                            {
-                                ProcessResult(regexResult, count, _previousReading);
-                            }
-                            else
-                            {
-                                if (Troubleshooting)
-                                {
-                                    Send($"{count}: ERROR! Unable to parse {match.Value} (regex) into byte");
-                                }
-                            }
-                        }
-                        else
-                        {
-                            if (Troubleshooting)
-                            {
-                                Send($"{count}: ERROR! Unable to parse {ocrResult.Text} into byte as no regex match");
-                            }
-                        }
+                    if (ocrResult.Confidence < _confidence)
+                    {
+                        continue;
                     }
+
+                    if (short.TryParse(resultString, out short result)) 
+                    {
+                        ProcessResult((short)(result + _base), count);
+                    }                    
+
+                    //if (short.TryParse(ocrResult.Text, out short result))
+                    //{
+                    //    ProcessResult(result, count);
+                    //}
+                    //else
+                    //{
+                    //    Regex regex = new Regex("\\d");
+                    //    Match match = regex.Match(ocrResult.Text);
+
+                    //    if (match.Success)
+                    //    {
+                    //        if (byte.TryParse(match.Value, out byte regexResult))
+                    //        {
+                    //            ProcessResult(regexResult, count);
+                    //        }
+                    //        else
+                    //        {
+                    //            if (Troubleshooting)
+                    //            {
+                    //                Send($"{count}: ERROR! Unable to parse {match.Value} (regex) into byte");
+                    //            }
+                    //        }
+                    //    }
+                    //    else
+                    //    {
+                    //        if (Troubleshooting)
+                    //        {
+                    //            Send($"{count}: ERROR! Unable to parse {ocrResult.Text} into byte as no regex match");
+                    //        }
+                    //    }
+                    //}
                 }
 
                 count++;
@@ -117,35 +128,14 @@ namespace AutoCycle2
             _udpClient.Send(bytes, bytes.Length, _ipEndPoint);
         }
 
-        private static bool IsWithinTolerance(byte result, byte previousReading)
+        private static void ProcessResult(short result, int count)
         {
-            return true;
-            //return (result - previousReading < _tolerance) ? true : false;
-        }
-
-        private static byte? ProcessResult(byte result, int count, byte? previousReading)
-        {
-            if (previousReading is null)
-            {
-                previousReading = result;
-            }
-
-            if (!IsWithinTolerance(result, previousReading.Value))
-            {
-                if (Troubleshooting)
-                {
-                    Send($"{count}: ERROR! {result} compared with previous reading of {previousReading} is not within tolerance of {_tolerance}. Aborting...");
-                }
-
-                return previousReading;
-            }
-
             if (result < _bikeLowerLimit)
             {
                 if (Troubleshooting)
                 {
                     Send($"{count}: ERROR! {result} is below bike lower limit. Sending 1...");
-                    return result;
+                    return;
                 }
 
                 Send(1);
@@ -156,7 +146,7 @@ namespace AutoCycle2
                 if (Troubleshooting)
                 {
                     Send($"{count}: ERROR! {result} is above bike upper limit. Sending 16...");
-                    return result;
+                    return;
                 }
 
                 Send(16);
@@ -166,13 +156,16 @@ namespace AutoCycle2
                 if (Troubleshooting)
                 {
                     Send($"{count}: SUCCESS! {result}");
-                    return result;
+                    return;
                 }
 
                 Send(result);
             }
+        }
 
-            return result;
+        private static short RemovePercent(OcrResult ocrResult)
+        {
+            return Convert.ToInt16(ocrResult.Text.Replace("%", ""));
         }
     }
 }
