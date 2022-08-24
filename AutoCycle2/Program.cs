@@ -5,6 +5,8 @@ using System.Text.RegularExpressions;
 using System.Text;
 using IronOcr;
 using System.Diagnostics.Metrics;
+using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace AutoCycle2
 {
@@ -22,12 +24,32 @@ namespace AutoCycle2
         private const ushort _poll = 1000;
         private const byte _confidence = 90;
         private const short _base = 3;
+        private static readonly Regex _digitsWithOptionalNegativeRegex = new Regex("-?\\d");
+
+        private readonly IEnumerable<YouTubeFeed> _youTubeFeeds = new List<YouTubeFeed>()
+        {
+            new YouTubeFeed
+            {
+                Name= "30 minute Fat Burning Indoor Cycling Workout Alps South Tyrol Lake Tour Garmin 4K Video",
+                Uri = new Uri("https://www.youtube.com/watch?v=sOpm6E1lnpc")
+            }
+        };
+
+        private class YouTubeFeed
+        {
+            public string Name { get; set; }
+            public Uri Uri { get; set; }
+        }
+
+        private const string _fileLocation = @"C:\Users\garry\OneDrive\Desktop\Test";
 
         private static bool Troubleshooting => false;
 
         static void Main(string[] args)
         {
             Console.WriteLine("AutoCycle2");
+            Console.WriteLine("");
+            //Console.WriteLine("Do you want to pick from a list of YouTube feeds?");
 
             TesseractConfiguration tesseractConfiguration = new TesseractConfiguration();
             tesseractConfiguration.PageSegmentationMode = TesseractPageSegmentationMode.SingleLine;
@@ -57,10 +79,17 @@ namespace AutoCycle2
 
                     if (Troubleshooting)
                     {
-                        ocrInput.SaveAsImages($"C:\\Users\\garry\\OneDrive\\Desktop\\Test\\{count}", OcrInput.ImageType.BMP);
+                        ocrInput.SaveAsImages($@"C:\Users\garry\OneDrive\Desktop\Test\{count}", OcrInput.ImageType.BMP);
                     }
 
                     OcrResult ocrResult = ironTesseract.Read(ocrInput);
+
+                    //using (StreamWriter sw = File.AppendText($@"{_fileLocation}\{DateTime.Now.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss").txt")
+                    //{
+                    //    sw.WriteLine("This");
+                    //    sw.WriteLine("is Extra");
+                    //    sw.WriteLine("Text");
+                    //}
 
                     string resultString = ocrResult.Text.Replace("%", "");
 
@@ -70,45 +99,14 @@ namespace AutoCycle2
 
                     if (ocrResult.Confidence < _confidence)
                     {
+                        Thread.Sleep(_poll);
                         continue;
                     }
 
-                    if (short.TryParse(resultString, out short result)) 
+                    if (short.TryParse(resultString, out short result))
                     {
                         ProcessResult((short)(result + _base), count);
-                    }                    
-
-                    //if (short.TryParse(ocrResult.Text, out short result))
-                    //{
-                    //    ProcessResult(result, count);
-                    //}
-                    //else
-                    //{
-                    //    Regex regex = new Regex("\\d");
-                    //    Match match = regex.Match(ocrResult.Text);
-
-                    //    if (match.Success)
-                    //    {
-                    //        if (byte.TryParse(match.Value, out byte regexResult))
-                    //        {
-                    //            ProcessResult(regexResult, count);
-                    //        }
-                    //        else
-                    //        {
-                    //            if (Troubleshooting)
-                    //            {
-                    //                Send($"{count}: ERROR! Unable to parse {match.Value} (regex) into byte");
-                    //            }
-                    //        }
-                    //    }
-                    //    else
-                    //    {
-                    //        if (Troubleshooting)
-                    //        {
-                    //            Send($"{count}: ERROR! Unable to parse {ocrResult.Text} into byte as no regex match");
-                    //        }
-                    //    }
-                    //}
+                    }
                 }
 
                 count++;
@@ -126,6 +124,92 @@ namespace AutoCycle2
         {
             byte[] bytes = Encoding.ASCII.GetBytes(message);
             _udpClient.Send(bytes, bytes.Length, _ipEndPoint);
+        }
+
+        private static short? ProcessOcrResult(OcrResult ocrResult, short previousOcrResult, int count)
+        {
+            if (ocrResult.Confidence >= _confidence && OcrResultHasDigits(ocrResult))
+            {
+                short result = ExtractDigits(ocrResult);
+
+                if (result < _bikeLowerLimit)
+                {
+                    if (Troubleshooting)
+                    {
+                        Send($"{count}: ERROR! {result} is below bike lower limit. Sending 1...");
+                    }
+
+                    Send(1);
+                    return result;
+                }
+                else if (result > _bikeUpperLimit)
+                {
+                    if (Troubleshooting)
+                    {
+                        Send($"{count}: ERROR! {result} is above bike upper limit. Sending 16...");
+                    }
+
+                    Send(16);
+                    return result;
+                }
+                else
+                {
+                    if (Troubleshooting)
+                    {
+                        Send($"{count}: SUCCESS! {result}");
+                    }
+
+                    Send(result);
+                    return result;
+                }
+            }
+            else
+            {
+                if (OcrResultHasDigits(ocrResult))
+                {
+                    short result = ExtractDigits(ocrResult);
+                    byte tolerance = 2;
+
+                    if (result - previousOcrResult < tolerance)
+                    {
+                        if (Troubleshooting)
+                        {
+                            Send($"{count}: SUCCESS! {result} (within tolerance)");
+                        }
+
+                        Send(result);
+                        return result;
+                    }
+                    else
+                    {
+                        if (Troubleshooting)
+                        {
+                            Send($"{count}: ERROR! No confidence and outwith tolerance");
+                        }
+
+                        return null;
+                    }
+                }
+                else
+                {
+                    if (Troubleshooting)
+                    {
+                        Send($"{count}: ERROR! No confidence and no digits in result");
+                    }
+
+                    return null;
+                }
+            }
+        }
+
+        private static short ExtractDigits(OcrResult ocrResult)
+        {
+            return Convert.ToInt16(_digitsWithOptionalNegativeRegex.Match(ocrResult.Text).Value);
+        }
+
+        private static bool OcrResultHasDigits(OcrResult ocrResult)
+        {
+            return _digitsWithOptionalNegativeRegex.IsMatch(ocrResult.Text);
         }
 
         private static void ProcessResult(short result, int count)
@@ -161,11 +245,6 @@ namespace AutoCycle2
 
                 Send(result);
             }
-        }
-
-        private static short RemovePercent(OcrResult ocrResult)
-        {
-            return Convert.ToInt16(ocrResult.Text.Replace("%", ""));
         }
     }
 }
