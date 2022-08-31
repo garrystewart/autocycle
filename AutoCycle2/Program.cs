@@ -50,6 +50,15 @@ namespace AutoCycle2
                 AreaToMonitor = new Rectangle(1744, 1012, 92, 44),
                 IsWhiteTextOnBlackBackground = true,
                 ConfidenceLevel = 90
+            },
+            new YouTubeFeed
+            {
+                Id = 3,
+                Name= "Fat Burning 40 Minute Sunshine Cycling Motivation Training 4k Ultra HD Video",
+                Uri = new Uri("https://www.youtube.com/watch?v=-ybtzixqrq4"),
+                AreaToMonitor = new Rectangle(335, 1028, 49, 29),
+                IsWhiteTextOnBlackBackground = true,
+                ConfidenceLevel = 90
             }
         };
 
@@ -77,7 +86,7 @@ namespace AutoCycle2
                 file.Delete();
             }
 
-            YouTubeFeed? youTubeFeed = GetYouTubeFeed(2);
+            YouTubeFeed? youTubeFeed = GetYouTubeFeed(3);
 
             if (youTubeFeed is null)
             {
