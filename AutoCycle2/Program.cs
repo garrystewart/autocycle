@@ -17,8 +17,9 @@ namespace AutoCycle2
         private readonly static UdpClient _udpClient = new UdpClient(5005);
         private readonly static IPEndPoint _ipEndPoint = new IPEndPoint(IPAddress.Parse("192.168.1.173"), 5005);
 
-        private const int _bikeLowerLimit = 1;
-        private const int _bikeUpperLimit = 16;
+        private static int _bikeLowerLimit;
+        private static int _bikeUpperLimit;
+        private static int _youTubeFeedId;
 
         private const int _screenWidth = 1920;
         private const int _screenHeight = 1080;
@@ -27,7 +28,7 @@ namespace AutoCycle2
         private const int _base = 0;
         private static readonly Regex _digitsWithOptionalNegativeRegex = new Regex("-?\\d");
 
-        private static readonly Dictionary<int, int> _profile = GetProfile(8);
+        private static Dictionary<int, int> _profile;
 
         private static readonly IEnumerable<YouTubeFeed> _youTubeFeeds = new List<YouTubeFeed>()
         {
@@ -59,6 +60,24 @@ namespace AutoCycle2
                 AreaToMonitor = new Rectangle(335, 1028, 49, 29),
                 IsWhiteTextOnBlackBackground = true,
                 ConfidenceLevel = 90
+            },
+            new YouTubeFeed
+            {
+                Id = 4,
+                Name= "Ultimate 45 minute MTB Fat Burning Cycling Workout Alps 🚵‍♂️😎 Dolomiti Italy Garmin 4K",
+                Uri = new Uri("https://www.youtube.com/watch?v=uWQoMwxd_AM"),
+                AreaToMonitor = new Rectangle(1738, 1024, 101, 56),
+                IsWhiteTextOnBlackBackground = true,
+                ConfidenceLevel = 90
+            },
+            new YouTubeFeed
+            {
+                Id = 5,
+                Name= "30 Minute Cycling Workout Brasa Canyon Italy Ultra HD Video Garmin",
+                Uri = new Uri("https://www.youtube.com/watch?v=x47SSiQea_M"),
+                AreaToMonitor = new Rectangle(318, 994, 87, 40),
+                IsWhiteTextOnBlackBackground = true,
+                ConfidenceLevel = 90
             }
         };
 
@@ -67,8 +86,17 @@ namespace AutoCycle2
         static void Main(string[] args)
         {
             Console.WriteLine("AutoCycle2");
-            Console.WriteLine("");
-            //Console.WriteLine("Do you want to pick from a list of YouTube feeds?");
+            Console.WriteLine();
+            Console.WriteLine("What is the bike's lower limit?");
+            _bikeLowerLimit = Convert.ToInt32(Console.ReadLine());
+            Console.WriteLine("What is the bike's upper limit?");
+            _bikeUpperLimit = Convert.ToInt32(Console.ReadLine());
+            Console.WriteLine("Which YouTube feed do you want to use?");
+            _youTubeFeedId = Convert.ToInt32(Console.ReadLine());
+            Console.WriteLine("What do you want to set as the base resistance?");
+            var baseResistance = Console.ReadLine();
+            _profile = GetProfile(Convert.ToInt32(baseResistance));
+            Console.WriteLine();
 
             TesseractConfiguration tesseractConfiguration = new TesseractConfiguration();
             tesseractConfiguration.PageSegmentationMode = TesseractPageSegmentationMode.SingleLine;
@@ -86,7 +114,7 @@ namespace AutoCycle2
                 file.Delete();
             }
 
-            YouTubeFeed? youTubeFeed = GetYouTubeFeed(3);
+            YouTubeFeed? youTubeFeed = GetYouTubeFeed(5);
 
             if (youTubeFeed is null)
             {
@@ -95,6 +123,8 @@ namespace AutoCycle2
 
             int count = 0;
             int? previousResult = null;
+
+            Console.WriteLine("Beginning OCR scanning...");
 
             while (true)
             {
@@ -292,12 +322,12 @@ namespace AutoCycle2
 
         private static int IsWithinBikeUpperLimit(int resistance)
         {
-            return (resistance <= _bikeUpperLimit) ? resistance : 16;
+            return (resistance <= _bikeUpperLimit) ? resistance : _bikeUpperLimit;
         }
 
         private static int IsWithinBikeLowerLimit(int resistance)
         {
-            return (resistance >= _bikeLowerLimit) ? resistance : 1;
+            return (resistance >= _bikeLowerLimit) ? resistance : _bikeLowerLimit;
         }
     }
 }
