@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AutoCycle2.Models
+namespace AutoCycle_Editor.Models
 {
     internal class Json
     {

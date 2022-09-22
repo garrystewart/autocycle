@@ -9,6 +9,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using AutoCycle2.Models;
 using System.Text.Json;
+using System.Diagnostics;
 
 namespace AutoCycle2
 {
@@ -25,10 +26,12 @@ namespace AutoCycle2
         private const int _screenHeight = 1080;
 
         private const int _poll = 1000;
-        private const int _base = 0;
+        private const int _tolerance = 2;
+        private const int _confidenceLevel = 90;
         private static readonly Regex _digitsWithOptionalNegativeRegex = new Regex("-?\\d");
 
         private static Dictionary<int, int> _profile;
+        private static int _toleranceCount = 0;
 
         private static readonly IEnumerable<YouTubeFeed> _youTubeFeeds = new List<YouTubeFeed>()
         {
@@ -91,12 +94,17 @@ namespace AutoCycle2
             _bikeLowerLimit = Convert.ToInt32(Console.ReadLine());
             Console.WriteLine("What is the bike's upper limit?");
             _bikeUpperLimit = Convert.ToInt32(Console.ReadLine());
-            Console.WriteLine("Which YouTube feed do you want to use?");
-            _youTubeFeedId = Convert.ToInt32(Console.ReadLine());
             Console.WriteLine("What do you want to set as the base resistance?");
             var baseResistance = Console.ReadLine();
+            Console.WriteLine("Which YouTube feed do you want to use?");
+            _youTubeFeedId = Convert.ToInt32(Console.ReadLine());
             _profile = GetProfile(Convert.ToInt32(baseResistance));
             Console.WriteLine();
+            //Console.WriteLine("Opening video...");
+
+            YouTubeFeed? youTubeFeed = GetYouTubeFeed(_youTubeFeedId);
+
+            //Process.Start($"C:\\Users\\garry\\Downloads\\{youTubeFeed.Name}-(2160p30).mp4");
 
             TesseractConfiguration tesseractConfiguration = new TesseractConfiguration();
             tesseractConfiguration.PageSegmentationMode = TesseractPageSegmentationMode.SingleLine;
@@ -114,7 +122,7 @@ namespace AutoCycle2
                 file.Delete();
             }
 
-            YouTubeFeed? youTubeFeed = GetYouTubeFeed(5);
+
 
             if (youTubeFeed is null)
             {
@@ -122,7 +130,7 @@ namespace AutoCycle2
             }
 
             int count = 0;
-            int? previousResult = null;
+            int? previousOcrResult = null;
 
             Console.WriteLine("Beginning OCR scanning...");
 
@@ -144,7 +152,7 @@ namespace AutoCycle2
                         ocrInput.Invert();
                     }
 
-                        ocrInput.SaveAsImages($@"C:\Users\garry\OneDrive\Desktop\Test\{count}", OcrInput.ImageType.BMP);
+                    ocrInput.SaveAsImages($@"C:\Users\garry\OneDrive\Desktop\Test\{count}", OcrInput.ImageType.BMP);
 
                     OcrResult ocrResult = ironTesseract.Read(ocrInput);
 
@@ -155,7 +163,7 @@ namespace AutoCycle2
                     //    sw.WriteLine("Text");
                     //}
 
-                    previousResult = ProcessOcrResult(youTubeFeed, ocrResult, previousResult, count);
+                    previousOcrResult = ProcessOcrResult(ocrResult, previousOcrResult, count);
                 }
 
                 count++;
@@ -191,90 +199,249 @@ namespace AutoCycle2
             return ocrResult.Confidence.ToString("0.00");
         }
 
-        private static int? ProcessOcrResult(YouTubeFeed youTubeFeed, OcrResult ocrResult, int? previousResult, int count)
+        private static int? ProcessOcrResult(OcrResult ocrResult, int? previousOcrResult, int count)
         {
-            if (ocrResult.Confidence >= youTubeFeed.ConfidenceLevel && OcrResultHasDigits(ocrResult))
+            // don't go by confidence initially as it's rubbish at being confident with negative numbers
+
+            // if the tolerance count goes above 5, reset previousOcrResult back to null and let confidence levels take over
+            if (_toleranceCount == 5)
             {
+                previousOcrResult = null;
+                _toleranceCount = 0;
+            }
+
+            // previousOcrResult starts off as null, to initialise it we are looking for something over 90% to set as a benchmark
+            if (previousOcrResult is null && ocrResult.Confidence >= _confidenceLevel && OcrResultHasDigits(ocrResult))
+            {
+                previousOcrResult = ExtractDigits(ocrResult);
+            }
+
+            if (OcrResultHasDigits(ocrResult))
+            {
+                // we've found digits, now to check if they are within tolerance
+
                 int result = ExtractDigits(ocrResult);
 
-                return CheckBikeLimits(result, ocrResult);                
-            }
-            else
-            {
-                if (OcrResultHasDigits(ocrResult))
+                if (previousOcrResult.HasValue && IsWithinTolerance(result, previousOcrResult.Value))
                 {
-                    int result = ExtractDigits(ocrResult);
-                    int tolerance = 2;
+                    int resultToSend = GetResistance(result);
 
-                    if (result - previousResult < tolerance)
+                    Send(new Json
                     {
-                        return CheckBikeLimits(result, ocrResult, true);
-                    }
-                    else
-                    {
-                        Send(new Json
-                        {
-                            Confidence = GetConfidence(ocrResult),
-                            OcrResultText = ocrResult.Text,
-                            WithinTolerance = false
-                        });
+                        Count = count,
+                        Result = resultToSend,
+                        Confidence = GetConfidence(ocrResult),
+                        OcrResultText = ocrResult.Text,
+                        WithinTolerance = true
+                    });
 
-                        return null;
-                    }
+                    return result;
                 }
                 else
                 {
                     Send(new Json
                     {
+                        Count = count,
                         Confidence = GetConfidence(ocrResult),
                         OcrResultText = ocrResult.Text,
+                        WithinTolerance = false
                     });
 
-                    return null;
+                    _toleranceCount++;
+
+                    return previousOcrResult;
                 }
-            }
-        }
-
-        private static int CheckBikeLimits(int result, OcrResult ocrResult, bool? withinTolerance = null)
-        {
-            result = GetResistance(result);
-
-            if (result < _bikeLowerLimit)
-            {
-                Send(new Json
-                {
-                    Confidence = GetConfidence(ocrResult),
-                    OcrResultText = ocrResult.Text,
-                    Result = 0 + _base,
-                    WithinTolerance = withinTolerance
-                });
-
-                return result;
-            }
-            else if (result > _bikeUpperLimit)
-            {
-                Send(new Json
-                {
-                    Confidence = GetConfidence(ocrResult),
-                    OcrResultText = ocrResult.Text,
-                    Result = 16,
-                    WithinTolerance = withinTolerance
-                });
-
-                return result;
             }
             else
             {
                 Send(new Json
                 {
+                    Count = count,
                     Confidence = GetConfidence(ocrResult),
                     OcrResultText = ocrResult.Text,
-                    Result = result + _base,
-                    WithinTolerance = withinTolerance
+                    NoDigits = true
                 });
 
-                return result;
+                _toleranceCount++;
+
+                return previousOcrResult;
             }
+
+
+
+            //// if there is no previous result to compare against, fall back to confidence
+
+            //if (previousOcrResult is null)
+            //{
+            //    if (ocrResult.Confidence >= youTubeFeed.ConfidenceLevel && OcrResultHasDigits(ocrResult))
+            //    {
+            //        int result = ExtractDigits(ocrResult);
+
+            //        CheckBikeLimits(result, ocrResult, count);
+
+            //        return result;
+            //    }
+            //    else
+            //    {
+            //        Send(new Json
+            //        {
+            //            Count = count,
+            //            Confidence = GetConfidence(ocrResult),
+            //            OcrResultText = ocrResult.Text,
+            //        });
+
+            //        return null;
+            //    }
+            //}
+            //else
+            //{
+            //    if (OcrResultHasDigits(ocrResult))
+            //    {
+            //        int result = ExtractDigits(ocrResult);
+
+            //        Console.WriteLine($"[{count}] result: {result} previousResult: {previousOcrResult} calculation: {result - previousOcrResult}");
+
+            //        if (IsWithinTolerance(result, previousOcrResult.Value))
+            //        {
+            //            Console.WriteLine($"[{count}] WithinTolerance");
+
+            //            CheckBikeLimits(result, ocrResult, count, true);
+
+            //            return result;
+            //        }
+            //        else
+            //        {
+            //            Send(new Json
+            //            {
+            //                Count = count,
+            //                Confidence = GetConfidence(ocrResult),
+            //                OcrResultText = ocrResult.Text,
+            //                //WithinTolerance = false,
+            //            });
+
+            //            return null;
+            //        }
+            //    }
+            //    else
+            //    {
+            //        Send(new Json
+            //        {
+            //            Count = count,
+            //            Confidence = GetConfidence(ocrResult),
+            //            OcrResultText = ocrResult.Text,
+            //        });
+
+            //        return null;
+            //    }
+            //}
+
+            //if (ocrResult.Confidence >= youTubeFeed.ConfidenceLevel && OcrResultHasDigits(ocrResult))
+            //{
+            //    int result = ExtractDigits(ocrResult);
+
+            //    if (result - previousOcrResult < _tolerance)
+            //    {
+            //        CheckBikeLimits(result, ocrResult, count);
+
+            //        return result;
+            //    }
+            //    else
+            //    {
+            //        Send(new Json
+            //        {
+            //            Count = count,
+            //            Confidence = GetConfidence(ocrResult),
+            //            OcrResultText = ocrResult.Text,
+            //            WithinTolerance = false,
+            //        });
+
+            //        return null;
+            //    }  
+            //}
+            //else
+            //{
+            //    if (OcrResultHasDigits(ocrResult))
+            //    {
+            //        int result = ExtractDigits(ocrResult);
+
+
+            //        Console.WriteLine($"[{count}] result: {result} previousResult: {previousOcrResult} calculation: {result - previousOcrResult}");
+
+            //        if (result - previousOcrResult < _tolerance)
+            //        {
+            //            Console.WriteLine($"[{count}] WithinTolerance");
+            //            CheckBikeLimits(result, ocrResult, count, true);
+            //            return result;
+            //        }
+            //        else
+            //        {
+            //            Send(new Json
+            //            {
+            //                Count = count,
+            //                Confidence = GetConfidence(ocrResult),
+            //                OcrResultText = ocrResult.Text,
+            //                WithinTolerance = false,
+            //            });
+
+            //            return null;
+            //        }
+            //    }
+            //    else
+            //    {
+            //        Send(new Json
+            //        {
+            //            Count = count,
+            //            Confidence = GetConfidence(ocrResult),
+            //            OcrResultText = ocrResult.Text,
+            //        });
+
+            //        return null;
+            //    }
+            //}
+        }
+
+        private static void CheckBikeLimits(int result, OcrResult ocrResult, int count)
+        {
+            result = GetResistance(result);
+
+            //if (result < _bikeLowerLimit)
+            //{
+            //    Send(new Json
+            //    {
+            //        Confidence = GetConfidence(ocrResult),
+            //        OcrResultText = ocrResult.Text,
+            //        Result = 1,
+            //        WithinTolerance = withinTolerance
+            //    });
+
+            //    return result;
+            //}
+            //else if (result > _bikeUpperLimit)
+            //{
+            //    Send(new Json
+            //    {
+            //        Confidence = GetConfidence(ocrResult),
+            //        OcrResultText = ocrResult.Text,
+            //        Result = 16,
+            //        WithinTolerance = withinTolerance
+            //    });
+
+            //    return result;
+            //}
+            //else
+            //{
+            Send(new Json
+            {
+                Count = count,
+                Confidence = GetConfidence(ocrResult),
+                OcrResultText = ocrResult.Text,
+                Result = result,
+                WithinTolerance = true
+                //WithinTolerance = withinTolerance
+            });
+
+            //return result;
+            //}
         }
 
         private static int ExtractDigits(OcrResult ocrResult)
@@ -328,6 +495,23 @@ namespace AutoCycle2
         private static int IsWithinBikeLowerLimit(int resistance)
         {
             return (resistance >= _bikeLowerLimit) ? resistance : _bikeLowerLimit;
+        }
+
+        private static void WriteMessage(string message)
+        {
+            Console.WriteLine(message);
+        }
+
+        private static bool IsWithinTolerance(int result, int previousResult)
+        {
+            if (result < previousResult)
+            {
+                return previousResult - result <= _tolerance;
+            }
+            else
+            {
+                return result - previousResult <= _tolerance;
+            }
         }
     }
 }
