@@ -5,9 +5,7 @@ VisualStudioVersion = 17.3.32804.467
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AutoCycle2", "..\AutoCycle2\AutoCycle2.csproj", "{7DFAB6F8-1ECF-444A-A494-8F0CF4C13EAE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoCycle_Recorder", "AutoCycle_Recorder\AutoCycle_Recorder.csproj", "{C05FA84E-672F-4671-B5CC-B2AE20E55594}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoCycle_Editor", "AutoCycle_Editor\AutoCycle_Editor.csproj", "{8C9C466A-47CB-4F4F-ACEC-EE93380CBF8D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AutoCycle", "AutoCycle_Editor\AutoCycle.csproj", "{8C9C466A-47CB-4F4F-ACEC-EE93380CBF8D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,10 +17,6 @@ Global
 		{7DFAB6F8-1ECF-444A-A494-8F0CF4C13EAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7DFAB6F8-1ECF-444A-A494-8F0CF4C13EAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7DFAB6F8-1ECF-444A-A494-8F0CF4C13EAE}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C05FA84E-672F-4671-B5CC-B2AE20E55594}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C05FA84E-672F-4671-B5CC-B2AE20E55594}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C05FA84E-672F-4671-B5CC-B2AE20E55594}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C05FA84E-672F-4671-B5CC-B2AE20E55594}.Release|Any CPU.Build.0 = Release|Any CPU
 		{8C9C466A-47CB-4F4F-ACEC-EE93380CBF8D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8C9C466A-47CB-4F4F-ACEC-EE93380CBF8D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8C9C466A-47CB-4F4F-ACEC-EE93380CBF8D}.Release|Any CPU.ActiveCfg = Release|Any CPU

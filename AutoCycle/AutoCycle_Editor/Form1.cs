@@ -5,9 +5,9 @@ using System.Net.Sockets;
 using System.Net;
 using System.Text.Json;
 using System.Text;
-using AutoCycle_Editor.Models;
 using static IronOcr.OcrResult;
 using System.Windows.Forms;
+using AutoCycle.Models;
 
 namespace AutoCycle_Editor
 {

@@ -1,4 +1,6 @@
-namespace AutoCycle_Editor
+using AutoCycle_Editor;
+
+namespace AutoCycle
 {
     internal static class Program
     {
@@ -11,7 +13,8 @@ namespace AutoCycle_Editor
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
-            Application.Run(new Form1());
+            //Application.Run(new Form1());
+            Application.Run(new HIIT());
         }
     }
 }
