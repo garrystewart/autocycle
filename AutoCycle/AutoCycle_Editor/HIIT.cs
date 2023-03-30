@@ -29,7 +29,7 @@ namespace AutoCycle_Editor
             {
                 if (row.Cells[1].Value is not null)
                 {
-                    BikeService.SendResistance(Convert.ToInt32(row.Cells[0].Value));
+                    BikeService.SendResistanceForHIIT(Convert.ToInt32(row.Cells[0].Value), (string)row.Cells[2].Value);
 
                     Thread.Sleep(Convert.ToInt32(row.Cells[1].Value));
                 }
@@ -62,7 +62,7 @@ namespace AutoCycle_Editor
                 {
                     foreach (DataGridViewRow row in dataGridView1.Rows)
                     {
-                        streamWriter.WriteLine($"{row.Cells[0].Value},{row.Cells[1].Value}");
+                        streamWriter.WriteLine($"{row.Cells[0].Value},{row.Cells[1].Value},{row.Cells[2].Value}");
                     }
 
                     streamWriter.Close();
@@ -82,7 +82,7 @@ namespace AutoCycle_Editor
                 {
                     string[] items = line.Split(',');
 
-                    dataGridView1.Rows.Add(items[0], items[1]);
+                    dataGridView1.Rows.Add(items[0], items[1], items[2]);
                 }
             }
         }

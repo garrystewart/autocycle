@@ -18,14 +18,14 @@ namespace AutoCycle.Services
         private static int _bikeLowerLimit = 1;
         private static int _bikeUpperLimit = 16;
 
-        public static void SendResistance(int resistance)
+        public static void SendResistanceForHIIT(int resistance, string message)
         {
             Send(new Json
             {
+                Type = Models.Type.HIIT,
                 Count = 0,
                 Result = resistance,
-                Confidence = "100",
-                OcrResultText = resistance.ToString()
+                Message = message
             });
         }
 

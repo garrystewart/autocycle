@@ -172,10 +172,7 @@ namespace AutoCycle_Editor
                         Send(new Json
                         {
                             Count = Convert.ToInt32(items[0]),
-                            Confidence = items[2],
-                            OcrResultText = items[1],
                             Result = GetResistance(Convert.ToInt32(items[1])),
-                            WithinTolerance = true
                             //WithinTolerance = withinTolerance
                         });
 
